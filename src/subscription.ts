@@ -97,6 +97,22 @@ export function setCustomerId(id: string): void {
 export async function loadSubscriptionStatus(): Promise<SubscriptionStatus> {
   const customerId = getCustomerId()
 
+  // Skip API call in development mode (no backend running)
+  if (import.meta.env.DEV) {
+    console.log('Dev mode: skipping API call, using localStorage fallback')
+    const stored = localStorage.getItem(STORAGE_KEYS.SUBSCRIPTION)
+    if (stored) {
+      try {
+        currentSubscription = { ...defaultSubscription, ...JSON.parse(stored), customerId }
+      } catch {
+        currentSubscription = { ...defaultSubscription, customerId }
+      }
+    } else {
+      currentSubscription = { ...defaultSubscription, customerId }
+    }
+    return currentSubscription
+  }
+
   try {
     // Try to get from API with customer ID
     const url = customerId 
