@@ -1,5 +1,6 @@
 // Subscription management module
 // Handles tier checks, upgrade flows, and invoice limits
+// Uses Stripe Customer metadata for persistent storage (no DB!)
 
 export interface SubscriptionStatus {
   tier: 'free' | 'unlimited' | 'multiBusiness'
@@ -9,6 +10,13 @@ export interface SubscriptionStatus {
   hasWatermark: boolean
   currentPeriodEnd?: number
   features: string[]
+  customerId: string | null
+}
+
+// Storage keys
+const STORAGE_KEYS = {
+  CUSTOMER_ID: 'invoice_customer_id',
+  SUBSCRIPTION: 'subscription_status'
 }
 
 // Pricing tiers configuration
@@ -68,20 +76,43 @@ const defaultSubscription: SubscriptionStatus = {
   invoiceCount: 0,
   invoiceLimit: 3,
   hasWatermark: true,
-  features: PRICING_TIERS.free.features
+  features: PRICING_TIERS.free.features,
+  customerId: null
 }
 
 // Current subscription state
 let currentSubscription: SubscriptionStatus = { ...defaultSubscription }
 
-// Load subscription status from API or localStorage
+// Get customer ID from localStorage
+export function getCustomerId(): string | null {
+  return localStorage.getItem(STORAGE_KEYS.CUSTOMER_ID)
+}
+
+// Set customer ID in localStorage
+export function setCustomerId(id: string): void {
+  localStorage.setItem(STORAGE_KEYS.CUSTOMER_ID, id)
+}
+
+// Load subscription status from API (which fetches from Stripe)
 export async function loadSubscriptionStatus(): Promise<SubscriptionStatus> {
+  const customerId = getCustomerId()
+
   try {
-    // Try to get from API first
-    const response = await fetch('/api/status')
+    // Try to get from API with customer ID
+    const url = customerId 
+      ? `/api/status?customerId=${encodeURIComponent(customerId)}`
+      : '/api/status'
+    
+    const response = await fetch(url)
     if (response.ok) {
       const data = await response.json()
       currentSubscription = { ...defaultSubscription, ...data }
+      
+      // Ensure customerId is set
+      if (!currentSubscription.customerId && customerId) {
+        currentSubscription.customerId = customerId
+      }
+      
       return currentSubscription
     }
   } catch (error) {
@@ -89,21 +120,23 @@ export async function loadSubscriptionStatus(): Promise<SubscriptionStatus> {
   }
 
   // Fallback to localStorage
-  const stored = localStorage.getItem('subscription_status')
+  const stored = localStorage.getItem(STORAGE_KEYS.SUBSCRIPTION)
   if (stored) {
     try {
-      currentSubscription = { ...defaultSubscription, ...JSON.parse(stored) }
+      currentSubscription = { ...defaultSubscription, ...JSON.parse(stored), customerId }
     } catch {
-      currentSubscription = { ...defaultSubscription }
+      currentSubscription = { ...defaultSubscription, customerId }
     }
+  } else {
+    currentSubscription = { ...defaultSubscription, customerId }
   }
 
   return currentSubscription
 }
 
-// Save subscription to localStorage
+// Save subscription to localStorage (for offline/fallback)
 function saveSubscription(status: SubscriptionStatus): void {
-  localStorage.setItem('subscription_status', JSON.stringify(status))
+  localStorage.setItem(STORAGE_KEYS.SUBSCRIPTION, JSON.stringify(status))
   currentSubscription = status
 }
 
@@ -120,10 +153,28 @@ export function canCreateInvoice(): { allowed: boolean; reason?: string } {
   return { allowed: true }
 }
 
-// Increment invoice count
-export function incrementInvoiceCount(): void {
+// Increment invoice count (syncs to Stripe)
+export async function incrementInvoiceCount(): Promise<number> {
+  const customerId = getCustomerId()
+  
+  // Always increment locally first
   currentSubscription.invoiceCount++
   saveSubscription(currentSubscription)
+
+  // If we have a customer ID, sync to Stripe
+  if (customerId) {
+    try {
+      await fetch('/api/increment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId })
+      })
+    } catch (error) {
+      console.error('Failed to sync invoice count to Stripe:', error)
+    }
+  }
+
+  return currentSubscription.invoiceCount
 }
 
 // Get current subscription
@@ -132,7 +183,9 @@ export function getSubscription(): SubscriptionStatus {
 }
 
 // Initiate upgrade flow
-export async function initiateUpgrade(tier: 'unlimited' | 'multiBusiness'): Promise<{ url?: string; error?: string }> {
+export async function initiateUpgrade(tier: 'unlimited' | 'multiBusiness'): Promise<{ url?: string; customerId?: string; error?: string }> {
+  const customerId = getCustomerId()
+  
   try {
     const origin = window.location.origin
     const response = await fetch('/api/checkout', {
@@ -142,6 +195,7 @@ export async function initiateUpgrade(tier: 'unlimited' | 'multiBusiness'): Prom
       },
       body: JSON.stringify({
         tier,
+        customerId: customerId || undefined,
         successUrl: `${origin}/success.html?session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${origin}/?cancelled=true`
       })
@@ -154,16 +208,37 @@ export async function initiateUpgrade(tier: 'unlimited' | 'multiBusiness'): Prom
 
     const data = await response.json()
     
+    // Save customer ID if provided
+    if (data.customerId) {
+      setCustomerId(data.customerId)
+    }
+    
     // If we got a URL, redirect to Stripe
     if (data.url) {
       window.location.href = data.url
-      return { url: data.url }
+      return { url: data.url, customerId: data.customerId }
     }
 
     return { error: 'No checkout URL received' }
   } catch (error) {
     console.error('Upgrade error:', error)
     return { error: 'Failed to initiate upgrade. Please try again.' }
+  }
+}
+
+// Handle successful checkout - extract customer ID from URL params
+export function handleCheckoutSuccess(): void {
+  const params = new URLSearchParams(window.location.search)
+  const customerId = params.get('customer_id')
+  
+  if (customerId) {
+    setCustomerId(customerId)
+    console.log('Customer ID saved from checkout:', customerId)
+  }
+  
+  // Clean up URL
+  if (window.location.search.includes('session_id')) {
+    window.history.replaceState({}, '', window.location.pathname)
   }
 }
 

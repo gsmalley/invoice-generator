@@ -1,7 +1,12 @@
-// Subscription status endpoint
-// In production, this would validate the user's session and check their subscription
+import Stripe from 'stripe'
+import { METADATA_KEYS } from './webhook'
 
-import { subscriptions } from './webhook'
+// Initialize Stripe
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
+  apiVersion: '2023-10-16'
+}) : null
 
 interface StatusQueryParams {
   customerId?: string
@@ -17,53 +22,77 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    // In a real app, we'd get the customer ID from the session
-    // For now, accept it as a query parameter for testing
+    // Get customer ID from query parameter
     const url = new URL(req.url)
     const customerId = url.searchParams.get('customerId')
 
+    // No customer ID means free tier (new user)
     if (!customerId) {
-      // Return default free tier status for unauthenticated users
       return new Response(JSON.stringify({
         tier: 'free',
         status: 'active',
         invoiceCount: 0,
         invoiceLimit: 3,
-        hasWatermark: true
+        hasWatermark: true,
+        customerId: null
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
     }
 
-    // Check subscription store
-    const subscription = subscriptions.get(customerId)
-
-    if (!subscription) {
-      // No subscription found, user is on free tier
+    // If Stripe is not configured, fall back to mock response
+    if (!stripe) {
+      console.log('Stripe not configured, returning mock status')
       return new Response(JSON.stringify({
         tier: 'free',
         status: 'active',
         invoiceCount: 0,
         invoiceLimit: 3,
-        hasWatermark: true
+        hasWatermark: true,
+        customerId,
+        mode: 'development'
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
     }
 
-    // Return subscription status
-    const tierInfo = getTierInfo(subscription.tier)
+    // Fetch customer from Stripe
+    let customer: Stripe.Customer
+    try {
+      customer = await stripe.customers.retrieve(customerId) as Stripe.Customer
+    } catch (err) {
+      // Customer not found, treat as new user
+      return new Response(JSON.stringify({
+        tier: 'free',
+        status: 'active',
+        invoiceCount: 0,
+        invoiceLimit: 3,
+        hasWatermark: true,
+        customerId
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Get subscription metadata
+    const metadata = customer.metadata || {}
+    const tier = metadata[METADATA_KEYS.TIER] || 'free'
+    const invoiceCount = parseInt(metadata[METADATA_KEYS.INVOICE_COUNT] || '0', 10)
+
+    // Get tier info
+    const tierInfo = getTierInfo(tier)
 
     return new Response(JSON.stringify({
-      tier: subscription.tier,
-      status: subscription.status,
-      currentPeriodEnd: subscription.currentPeriodEnd,
-      invoiceCount: 0, // Would come from database
+      tier,
+      status: customer.deleted ? 'cancelled' : 'active',
+      invoiceCount,
       invoiceLimit: tierInfo.invoiceLimit,
       hasWatermark: !tierInfo.removeWatermark,
-      features: tierInfo.features
+      features: tierInfo.features,
+      customerId
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

@@ -7,15 +7,13 @@ const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
   apiVersion: '2023-10-16'
 }) : null
 
-// Simple in-memory store for subscriptions (use database in production)
-// Format: { customerId: { tier, status, createdAt, currentPeriodEnd } }
-const subscriptions = new Map<string, {
-  tier: string
-  status: string
-  createdAt: number
-  currentPeriodEnd: number
-  subscriptionId: string
-}>()
+// Stripe metadata keys
+const METADATA_KEYS = {
+  TIER: 'invoice_tier',
+  INVOICE_COUNT: 'invoice_count',
+  BILLING_CYCLE_START: 'billing_cycle_start',
+  SUBSCRIPTION_ID: 'subscription_id'
+}
 
 interface WebhookEvent {
   type: string
@@ -25,6 +23,7 @@ interface WebhookEvent {
       customer?: string
       metadata?: Record<string, string>
       status?: string
+      current_period_end?: number
       items?: {
         data: Array<{
           price?: {
@@ -87,12 +86,14 @@ export default async function handler(req: Request): Promise<Response> {
         const customerId = session.customer as string
         const tier = session.metadata?.tier || 'unlimited'
 
-        subscriptions.set(customerId, {
-          tier,
-          status: 'active',
-          createdAt: Date.now(),
-          currentPeriodEnd: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
-          subscriptionId: session.id
+        // Update customer metadata in Stripe
+        await stripe.customers.update(customerId, {
+          metadata: {
+            [METADATA_KEYS.TIER]: tier,
+            [METADATA_KEYS.INVOICE_COUNT]: '0',
+            [METADATA_KEYS.BILLING_CYCLE_START]: Date.now().toString(),
+            [METADATA_KEYS.SUBSCRIPTION_ID]: session.id
+          }
         })
 
         console.log(`Subscription activated for customer ${customerId}: ${tier}`)
@@ -103,18 +104,15 @@ export default async function handler(req: Request): Promise<Response> {
         const subscription = event.data.object
         const customerId = subscription.customer as string
 
-        if (subscriptions.has(customerId)) {
-          const existing = subscriptions.get(customerId)!
-          subscriptions.set(customerId, {
-            ...existing,
-            status: subscription.status || existing.status,
-            currentPeriodEnd: subscription.current_period_end 
-              ? (subscription.current_period_end as number) * 1000 
-              : existing.currentPeriodEnd
-          })
+        // Update customer metadata with subscription status
+        await stripe.customers.update(customerId, {
+          metadata: {
+            [METADATA_KEYS.SUBSCRIPTION_ID]: subscription.id,
+            [METADATA_KEYS.BILLING_CYCLE_START]: ((subscription.current_period_end as number) - 30 * 24 * 60 * 60).toString()
+          }
+        })
 
-          console.log(`Subscription updated for customer ${customerId}: ${subscription.status}`)
-        }
+        console.log(`Subscription updated for customer ${customerId}: ${subscription.status}`)
         break
       }
 
@@ -122,10 +120,15 @@ export default async function handler(req: Request): Promise<Response> {
         const subscription = event.data.object
         const customerId = subscription.customer as string
 
-        if (subscriptions.has(customerId)) {
-          subscriptions.delete(customerId)
-          console.log(`Subscription cancelled for customer ${customerId}`)
-        }
+        // Reset to free tier when subscription is cancelled
+        await stripe.customers.update(customerId, {
+          metadata: {
+            [METADATA_KEYS.TIER]: 'free',
+            [METADATA_KEYS.SUBSCRIPTION_ID]: ''
+          }
+        })
+
+        console.log(`Subscription cancelled for customer ${customerId}, reset to free tier`)
         break
       }
 
@@ -133,15 +136,8 @@ export default async function handler(req: Request): Promise<Response> {
         const invoice = event.data.object
         const customerId = invoice.customer as string
 
-        if (subscriptions.has(customerId)) {
-          const existing = subscriptions.get(customerId)!
-          subscriptions.set(customerId, {
-            ...existing,
-            status: 'past_due'
-          })
-
-          console.log(`Payment failed for customer ${customerId}`)
-        }
+        // Could add past_due status to metadata if needed
+        console.log(`Payment failed for customer ${customerId}`)
         break
       }
 
@@ -166,5 +162,5 @@ export default async function handler(req: Request): Promise<Response> {
   }
 }
 
-// Export for testing
-export { subscriptions }
+// Export metadata keys for other modules
+export { METADATA_KEYS }

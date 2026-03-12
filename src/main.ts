@@ -1,7 +1,7 @@
 import './style.css'
 import type { LineItem, InvoiceData } from './types'
 import { downloadInvoicePDF } from './pdf-generator'
-import { loadSubscriptionStatus, canCreateInvoice, incrementInvoiceCount, initiateUpgrade, renderPricingCards } from './subscription'
+import { loadSubscriptionStatus, canCreateInvoice, incrementInvoiceCount, initiateUpgrade, renderPricingCards, handleCheckoutSuccess } from './subscription'
 
 // localStorage key
 const STORAGE_KEY = 'invoice_draft'
@@ -674,6 +674,12 @@ function showUpgradeModal(isLimitReached: boolean = false) {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
+  // Check if returning from checkout success
+  if (window.location.search.includes('session_id')) {
+    handleCheckoutSuccess()
+    showToast('Upgrade successful! 🎉')
+  }
+  
   // Try to load saved draft from localStorage
   const savedData = loadFromLocalStorage()
   if (savedData) {
