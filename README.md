@@ -1,6 +1,6 @@
-# Invoice Generator
+# IOU Maker
 
-A web-based invoice generation application.
+A web-based IOU/invoice generation application.
 
 ## Repository Structure
 
