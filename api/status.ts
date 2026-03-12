@@ -1,12 +1,19 @@
 import Stripe from 'stripe'
 import { METADATA_KEYS } from './webhook'
 
-// Initialize Stripe
+// Initialize Stripe (only if key is available)
+let stripe: Stripe | null = null
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
-  apiVersion: '2023-10-16'
-}) : null
+if (stripeSecretKey) {
+  try {
+    stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2023-10-16'
+    })
+  } catch (err) {
+    console.error('Failed to initialize Stripe:', err)
+  }
+}
 
 interface StatusQueryParams {
   customerId?: string
