@@ -1,6 +1,13 @@
-import { defineConfig } from 'vite'
-import tailwindcss from '@tailwindcss/vite'
-
-export default defineConfig({
-  plugins: [tailwindcss()],
-})
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "functions": {
+    "api/*.ts": {
+      "runtime": "nodejs20"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" }
+  ]
+}
