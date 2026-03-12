@@ -1,5 +1,6 @@
 import './style.css'
 import type { LineItem, InvoiceData } from './types'
+import { downloadInvoicePDF } from './pdf-generator'
 
 // Icons as SVG strings
 const icons = {
@@ -510,7 +511,7 @@ function setupEventListeners() {
   app.addEventListener('click', (e) => {
     const target = e.target as HTMLElement
     if (target.closest('#download-btn')) {
-      alert('PDF download coming soon!')
+      downloadInvoicePDF(state)
     }
   })
 }
