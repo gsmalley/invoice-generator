@@ -513,14 +513,29 @@ function updateFormField(e: Event) {
 function setupEventListeners() {
   const app = document.getElementById('app')!
   
-  // Line items - input changes
+  // Line items - input changes (but skip re-render on description to prevent focus loss)
   app.addEventListener('input', (e) => {
     const target = e.target as HTMLInputElement
     const field = target.dataset.field
     const index = parseInt(target.dataset.index || '0')
     
     if (field) {
-      updateLineItem(index, field as keyof LineItem, target.value)
+      // Update state without re-rendering to prevent focus loss on description input
+      if (field === 'description') {
+        state.lineItems[index].description = target.value
+        saveToLocalStorage(state)
+      } else {
+        updateLineItem(index, field as keyof LineItem, target.value)
+      }
+    }
+  })
+  
+  // Prevent keydown from causing input to jump/lose focus
+  app.addEventListener('keydown', (e) => {
+    const target = e.target as HTMLInputElement
+    if (target.dataset.field) {
+      // Stop propagation to prevent any default behaviors that might cause focus issues
+      e.stopPropagation()
     }
   })
   

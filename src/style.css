@@ -235,6 +235,15 @@ body {
   grid-template-columns: 1fr 1fr 1fr;
 }
 
+/* Prevent Invoice # field from wrapping */
+.form-grid.three-col .form-group:first-child {
+  white-space: nowrap;
+}
+
+.form-grid.three-col .form-group:first-child .form-input {
+  min-width: 120px;
+}
+
 /* Form Elements */
 .form-group {
   display: flex;
