@@ -1,6 +1,7 @@
 import './style.css'
 import type { LineItem, InvoiceData } from './types'
 import { downloadInvoicePDF } from './pdf-generator'
+import { loadSubscriptionStatus, canCreateInvoice, incrementInvoiceCount, initiateUpgrade, renderPricingCards } from './subscription'
 
 // localStorage key
 const STORAGE_KEY = 'invoice_draft'
@@ -595,7 +596,8 @@ function setupEventListeners() {
   app.addEventListener('click', (e) => {
     const target = e.target as HTMLElement
     if (target.closest('#download-btn')) {
-      downloadInvoicePDF(state)
+      // Check subscription before downloading
+      checkAndProcessDownload()
     }
   })
 }
@@ -606,13 +608,85 @@ function render() {
   app.innerHTML = renderApp()
 }
 
+// Check subscription and process download
+async function checkAndProcessDownload() {
+  const check = canCreateInvoice()
+  
+  if (!check.allowed) {
+    // Show upgrade prompt
+    const upgrade = confirm(`${check.reason}\n\nWould you like to upgrade now?`)
+    if (upgrade) {
+      showUpgradeModal()
+    }
+    return
+  }
+  
+  // Process the download
+  downloadInvoicePDF(state)
+  
+  // Increment invoice count for free tier
+  incrementInvoiceCount()
+  
+  // Check if they've reached limit after this download
+  loadSubscriptionStatus().then(status => {
+    if (status.tier === 'free' && status.invoiceCount >= status.invoiceLimit) {
+      showUpgradeModal(true)
+    }
+  })
+}
+
+// Show upgrade modal
+function showUpgradeModal(isLimitReached: boolean = false) {
+  const modal = document.createElement('div')
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal-content">
+      <button class="modal-close" id="modal-close">×</button>
+      <h2>${isLimitReached ? 'Free Limit Reached! 🚀' : 'Upgrade Your Plan'}</h2>
+      <p>${isLimitReached 
+        ? 'You\'ve used all your free invoices. Upgrade to remove limits!' 
+        : 'Unlock unlimited invoices and premium features.'}</p>
+      <div class="pricing-grid">
+        ${renderPricingCards('free')}
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+  
+  // Close modal handlers
+  modal.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).classList.contains('modal-overlay') || 
+        (e.target as HTMLElement).id === 'modal-close') {
+      modal.remove()
+    }
+  })
+  
+  // Upgrade button handlers
+  modal.querySelectorAll('.upgrade-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const tier = (e.target as HTMLElement).dataset.tier
+      if (tier === 'unlimited' || tier === 'multiBusiness') {
+        await initiateUpgrade(tier)
+      }
+    })
+  })
+}
+
 // Initialize app
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Try to load saved draft from localStorage
   const savedData = loadFromLocalStorage()
   if (savedData) {
     Object.assign(state, savedData)
     showToast('Draft loaded')
+  }
+  
+  // Load subscription status
+  const subscriptionStatus = await loadSubscriptionStatus()
+  
+  // Check if watermark should be shown (free tier)
+  if (subscriptionStatus.hasWatermark && subscriptionStatus.tier === 'free') {
+    console.log('Watermark will be applied to PDFs (free tier)')
   }
   
   render()
