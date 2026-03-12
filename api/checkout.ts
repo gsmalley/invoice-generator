@@ -1,15 +1,17 @@
-import Stripe from 'stripe'
-
-// Initialize Stripe with secret key
+// Conditionally import Stripe only if key is available
+let stripe: any = null
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 
-if (!stripeSecretKey && process.env.NODE_ENV !== 'development') {
-  console.error('STRIPE_SECRET_KEY is not set')
+if (stripeSecretKey) {
+  try {
+    const Stripe = require('stripe')
+    stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2023-10-16'
+    })
+  } catch (err) {
+    console.error('Failed to initialize Stripe:', err)
+  }
 }
-
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
-  apiVersion: '2023-10-16'
-}) : null
 
 // Price IDs from Stripe Dashboard (replace with actual IDs after creating products)
 const PRICES = {

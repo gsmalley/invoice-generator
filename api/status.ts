@@ -1,12 +1,13 @@
-import Stripe from 'stripe'
 import { METADATA_KEYS } from './webhook'
 
-// Initialize Stripe (only if key is available)
-let stripe: Stripe | null = null
+// Conditionally import Stripe only if key is available
+let stripe: any = null
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 
 if (stripeSecretKey) {
   try {
+    // Dynamic import to avoid issues when Stripe is not installed
+    const Stripe = require('stripe')
     stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2023-10-16'
     })
