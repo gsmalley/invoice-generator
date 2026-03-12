@@ -618,3 +618,27 @@ textarea.form-input {
 .hidden {
   display: none !important;
 }
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--color-success, #22c55e);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(100px);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  z-index: 9999;
+}
+
+.toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+

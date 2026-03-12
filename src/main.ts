@@ -2,6 +2,51 @@ import './style.css'
 import type { LineItem, InvoiceData } from './types'
 import { downloadInvoicePDF } from './pdf-generator'
 
+// localStorage key
+const STORAGE_KEY = 'invoice_draft'
+
+// LocalStorage Functions
+function saveToLocalStorage(data: InvoiceData): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    showToast('Draft auto-saved')
+  } catch (e) {
+    console.error('Failed to save to localStorage:', e)
+  }
+}
+
+function loadFromLocalStorage(): InvoiceData | null {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    return saved ? JSON.parse(saved) : null
+  } catch (e) {
+    console.error('Failed to load from localStorage:', e)
+    return null
+  }
+}
+
+function clearLocalStorage(): void {
+  localStorage.removeItem(STORAGE_KEY)
+  showToast('Draft cleared')
+}
+
+// Toast notification
+function showToast(message: string) {
+  const existing = document.querySelector('.toast')
+  if (existing) existing.remove()
+  
+  const toast = document.createElement('div')
+  toast.className = 'toast'
+  toast.textContent = message
+  document.body.appendChild(toast)
+  
+  setTimeout(() => toast.classList.add('show'), 10)
+  setTimeout(() => {
+    toast.classList.remove('show')
+    setTimeout(() => toast.remove(), 300)
+  }, 2000)
+}
+
 // Icons as SVG strings
 const icons = {
   document: `<svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>`,
@@ -363,6 +408,10 @@ function renderMainContent(): string {
                 ${icons.save}
                 Save Draft
               </button>
+              <button type="button" class="btn btn-ghost" id="clear-draft-btn">
+                ${icons.trash}
+                Clear Draft
+              </button>
             </div>
             <div class="right">
               <button type="button" class="btn btn-outline" id="preview-btn">
@@ -403,12 +452,17 @@ function updateLineItem(index: number, field: keyof LineItem, value: string | nu
       state.lineItems[index].rate = numValue
     }
   }
+  
+  // Auto-save to localStorage on line item change
+  saveToLocalStorage(state)
+  
   render()
 }
 
 // Add new line item
 function addLineItem() {
   state.lineItems.push({ description: '', quantity: 1, rate: 0 })
+  saveToLocalStorage(state)
   render()
 }
 
@@ -416,6 +470,7 @@ function addLineItem() {
 function removeLineItem(index: number) {
   if (state.lineItems.length > 1) {
     state.lineItems.splice(index, 1)
+    saveToLocalStorage(state)
     render()
   }
 }
@@ -444,6 +499,9 @@ function updateFormField(e: Event) {
     case 'paymentTerms': state.notes.paymentTerms = value; break
     case 'thankYou': state.notes.thankYou = value; break
   }
+  
+  // Auto-save to localStorage on any field change
+  saveToLocalStorage(state)
   
   // Re-render totals when tax or discount changes
   if (name === 'taxRate' || name === 'discount' || name === 'currency') {
@@ -490,12 +548,23 @@ function setupEventListeners() {
     updateFormField(e)
   })
   
-  // Save draft
+  // Save draft button
   app.addEventListener('click', (e) => {
     const target = e.target as HTMLElement
     if (target.closest('#save-draft-btn')) {
-      console.log('Saving draft:', state)
-      alert('Draft saved! (Check console for data)')
+      saveToLocalStorage(state)
+    }
+  })
+  
+  // Clear draft button
+  app.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement
+    if (target.closest('#clear-draft-btn')) {
+      if (confirm('Are you sure you want to clear the saved draft? This cannot be undone.')) {
+        clearLocalStorage()
+        // Reset to default state
+        location.reload()
+      }
     }
   })
   
@@ -524,6 +593,13 @@ function render() {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+  // Try to load saved draft from localStorage
+  const savedData = loadFromLocalStorage()
+  if (savedData) {
+    Object.assign(state, savedData)
+    showToast('Draft loaded')
+  }
+  
   render()
   setupEventListeners()
 })
