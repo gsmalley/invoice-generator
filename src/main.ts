@@ -66,9 +66,34 @@ const icons = {
 }
 
 // Application State
-type ViewType = 'invoice' | 'clients' | 'settings'
+type ViewType = 'invoice' | 'invoices' | 'clients' | 'settings' | 'profile'
 
 let currentView: ViewType = 'invoice'
+
+// URL-based routing
+function getViewFromUrl(): ViewType {
+  const path = window.location.pathname
+  if (path === '/') return 'invoice'
+  if (path === '/invoices') return 'invoices'
+  if (path === '/clients') return 'clients'
+  if (path === '/settings') return 'settings'
+  if (path === '/profile') return 'profile'
+  return 'invoice'
+}
+
+function updateUrl(view: ViewType) {
+  const pathMap: Record<ViewType, string> = {
+    'invoice': '/',
+    'invoices': '/invoices',
+    'clients': '/clients',
+    'settings': '/settings',
+    'profile': '/profile'
+  }
+  const newPath = pathMap[view] || '/'
+  if (window.location.pathname !== newPath) {
+    history.pushState({}, '', newPath)
+  }
+}
 
 const state: InvoiceData = {
   business: {
@@ -140,7 +165,7 @@ function renderSidebar(): string {
           ${icons.document}
           New Invoice
         </button>
-        <button class="nav-item ${currentView === 'invoice' ? 'active' : ''}" data-view="invoice">
+        <button class="nav-item ${currentView === 'invoices' ? 'active' : ''}" data-view="invoices">
           ${icons.folder}
           Invoices
         </button>
@@ -156,7 +181,7 @@ function renderSidebar(): string {
       
       <nav class="nav-section" style="margin-top: auto;">
         <div class="nav-label">Account</div>
-        <button class="nav-item">
+        <button class="nav-item ${currentView === 'profile' ? 'active' : ''}" data-view="profile">
           ${icons.user}
           Profile
         </button>
@@ -232,10 +257,18 @@ function renderTotals(): string {
 
 // Render main content based on current view
 function renderMainContent(): string {
-  if (currentView === 'clients') {
-    return renderClientsPage()
+  switch (currentView) {
+    case 'clients':
+      return renderClientsPage()
+    case 'invoices':
+      return renderInvoicesListPage()
+    case 'settings':
+      return renderSettingsPage()
+    case 'profile':
+      return renderProfilePage()
+    default:
+      return renderInvoiceForm()
   }
-  return renderInvoiceForm()
 }
 
 // Render Clients management page
@@ -261,6 +294,68 @@ function renderClientsPage(): string {
         
         <div class="client-form-container" id="client-form-container" style="display: none;">
           ${clients.renderClientForm()}
+        </div>
+      </div>
+    </main>
+  `
+}
+
+// Render Invoices list page
+function renderInvoicesListPage(): string {
+  return `
+    <main class="main-content">
+      <header class="page-header">
+        <h1 class="page-title">Invoices</h1>
+        <button class="btn btn-primary" data-view="invoice">
+          ${icons.plus} New Invoice
+        </button>
+      </header>
+      <div class="invoices-list">
+        <p class="empty-state">No invoices yet. Create your first invoice!</p>
+      </div>
+    </main>
+  `
+}
+
+// Render Settings page
+function renderSettingsPage(): string {
+  return `
+    <main class="main-content">
+      <header class="page-header">
+        <h1 class="page-title">Settings</h1>
+      </header>
+      <div class="settings-section">
+        <h3>Invoice Defaults</h3>
+        <div class="form-group">
+          <label>Default Currency</label>
+          <select class="form-control" data-field="currency">
+            <option value="USD" ${state.settings.currency === 'USD' ? 'selected' : ''}>USD ($)</option>
+            <option value="EUR" ${state.settings.currency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
+            <option value="GBP" ${state.settings.currency === 'GBP' ? 'selected' : ''}>GBP (£)</option>
+            <option value="CAD" ${state.settings.currency === 'CAD' ? 'selected' : ''}>CAD ($)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Default Tax Rate (%)</label>
+          <input type="number" class="form-control" data-field="taxRate" value="${state.settings.taxRate}" min="0" max="100">
+        </div>
+      </div>
+    </main>
+  `
+}
+
+// Render Profile page
+function renderProfilePage(): string {
+  return `
+    <main class="main-content">
+      <header class="page-header">
+        <h1 class="page-title">Profile</h1>
+      </header>
+      <div class="profile-section">
+        <h3>Account Settings</h3>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" class="form-control" value="${state.business.email}" placeholder="your@email.com">
         </div>
       </div>
     </main>
@@ -566,6 +661,7 @@ function setupEventListeners() {
       const view = viewButton.dataset.view as ViewType
       if (view) {
         currentView = view
+        updateUrl(view)
         render()
         setupEventListeners()
       }
@@ -822,6 +918,9 @@ function showUpgradeModal(isLimitReached: boolean = false) {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
+  // Set initial view from URL
+  currentView = getViewFromUrl()
+  
   // Check if returning from checkout success
   if (window.location.search.includes('session_id')) {
     handleCheckoutSuccess()
