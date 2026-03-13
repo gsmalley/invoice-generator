@@ -140,7 +140,7 @@ function renderSidebar(): string {
           ${icons.document}
           New Invoice
         </button>
-        <button class="nav-item">
+        <button class="nav-item ${currentView === 'invoice' ? 'active' : ''}" data-view="invoice">
           ${icons.folder}
           Invoices
         </button>
