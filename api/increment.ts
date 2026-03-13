@@ -1,12 +1,19 @@
-import Stripe from 'stripe'
 import { METADATA_KEYS } from './webhook'
 
-// Initialize Stripe
+// Conditionally import Stripe only if key is available
+let stripe: any = null
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, {
-  apiVersion: '2023-10-16'
-}) : null
+if (stripeSecretKey) {
+  try {
+    const Stripe = require('stripe')
+    stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2023-10-16'
+    })
+  } catch (err) {
+    console.error('Failed to initialize Stripe:', err)
+  }
+}
 
 export default async function handler(req: Request): Promise<Response> {
   // Only allow POST
