@@ -557,6 +557,21 @@ function updateFormField(e: Event) {
 function setupEventListeners() {
   const app = document.getElementById('app')!
   
+  // View switching - handles navigation between Invoice/Clients/Settings views
+  app.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement
+    const viewButton = target.closest('[data-view]') as HTMLElement
+    
+    if (viewButton) {
+      const view = viewButton.dataset.view as ViewType
+      if (view) {
+        currentView = view
+        render()
+        setupEventListeners()
+      }
+    }
+  })
+  
   // Line items - input changes (but skip re-render on description to prevent focus loss)
   app.addEventListener('input', (e) => {
     const target = e.target as HTMLInputElement
@@ -713,24 +728,6 @@ function showUpgradeModal(isLimitReached: boolean = false) {
       }
     })
   })
-  
-  // View switching
-  {
-    const appEl = document.getElementById('app')!
-    appEl.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement
-      const viewButton = target.closest('[data-view]') as HTMLElement
-      
-      if (viewButton) {
-        const view = viewButton.dataset.view as ViewType
-        if (view) {
-          currentView = view
-          render()
-          setupEventListeners()
-        }
-      }
-    })
-  }
   
   // Client management
   {
