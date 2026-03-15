@@ -1303,9 +1303,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   // Initialize Supabase auth
-  await initAuth()
-  
-  // Listen for auth changes and re-render UI
+  // Register auth change listener BEFORE init to catch initial session
   onAuthChange((user) => {
     console.log('Auth changed:', user?.email)
     render()
@@ -1314,6 +1312,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       loadClientsList()
     }
   })
+  
+  await initAuth()
   
   const authState = getAuthState()
   

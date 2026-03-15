@@ -56,6 +56,15 @@ export async function signUp(email: string, password: string): Promise<{ user: U
     return { user: null, error: error.message }
   }
 
+  // Update local auth state if user is immediately confirmed (or auto-confirm)
+  if (data.user && data.session) {
+    currentAuthState = { user: data.user as User, loading: false, error: null }
+    // Notify UI immediately
+    if (authChangeCallback) {
+      authChangeCallback(data.user as User)
+    }
+  }
+
   return { user: data.user as User | null, error: null }
 }
 
@@ -69,12 +78,25 @@ export async function signIn(email: string, password: string): Promise<{ user: U
     return { user: null, error: error.message }
   }
 
+  // Update local auth state immediately
+  if (data.user) {
+    currentAuthState = { user: data.user as User, loading: false, error: null }
+    // Notify UI immediately
+    if (authChangeCallback) {
+      authChangeCallback(data.user as User)
+    }
+  }
+
   return { user: data.user as User | null, error: null }
 }
 
 export async function signOut(): Promise<void> {
   await supabase.auth.signOut()
   currentAuthState = { user: null, loading: false, error: null }
+  // Notify UI of auth change
+  if (authChangeCallback) {
+    authChangeCallback(null)
+  }
 }
 
 export function getCurrentUser(): User | null {
@@ -93,6 +115,19 @@ export function getAuthState(): AuthState {
 // Initialize auth state listener
 export function initAuth(): Promise<User | null> {
   return new Promise((resolve) => {
+    // Listen for auth changes FIRST (before checking session) to catch initial state
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        currentAuthState = { user: session.user as User, loading: false, error: null }
+      } else {
+        currentAuthState = { user: null, loading: false, error: null }
+      }
+      // Notify UI of auth change
+      if (authChangeCallback) {
+        authChangeCallback(currentAuthState.user)
+      }
+    })
+
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
@@ -104,23 +139,14 @@ export function initAuth(): Promise<User | null> {
 
       if (session?.user) {
         currentAuthState = { user: session.user as User, loading: false, error: null }
+        // Notify UI of existing session
+        if (authChangeCallback) {
+          authChangeCallback(session.user as User)
+        }
         resolve(session.user as User)
       } else {
         currentAuthState = { user: null, loading: false, error: null }
         resolve(null)
-      }
-    })
-
-    // Listen for auth changes
-    supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        currentAuthState = { user: session.user as User, loading: false, error: null }
-      } else {
-        currentAuthState = { user: null, loading: false, error: null }
-      }
-      // Notify UI of auth change
-      if (authChangeCallback) {
-        authChangeCallback(currentAuthState.user)
       }
     })
   })
