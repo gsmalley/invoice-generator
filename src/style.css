@@ -811,3 +811,118 @@ textarea.form-input {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Preview Modal */
+.preview-modal {
+  max-width: 700px;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.preview-logo {
+  background: var(--color-primary);
+  color: white;
+  font-weight: bold;
+  padding: 8px 12px;
+  border-radius: 4px;
+  height: fit-content;
+}
+
+.preview-business h2 {
+  font-size: 18px;
+  color: var(--color-text);
+  margin: 0 0 4px 0;
+}
+
+.preview-business p {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 2px 0;
+}
+
+.preview-invoice-meta {
+  text-align: right;
+}
+
+.preview-invoice-meta h1 {
+  font-size: 28px;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.preview-invoice-meta p {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 2px 0;
+}
+
+.preview-client {
+  margin-bottom: 20px;
+}
+
+.preview-client h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0 0 4px 0;
+}
+
+.preview-client p {
+  margin: 2px 0;
+  font-size: 14px;
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.preview-table th {
+  background: var(--color-primary);
+  color: white;
+  padding: 10px;
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.preview-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+.preview-totals {
+  text-align: right;
+  margin-bottom: 20px;
+}
+
+.preview-totals .totals-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 40px;
+  padding: 6px 0;
+  font-size: 14px;
+}
+
+.preview-totals .totals-row.total {
+  font-weight: bold;
+  font-size: 18px;
+  color: var(--color-primary);
+  border-top: 2px solid var(--color-primary);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.preview-notes h4,
+.preview-thanks p {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}

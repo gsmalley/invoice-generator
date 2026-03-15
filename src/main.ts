@@ -781,7 +781,7 @@ function setupEventListeners() {
   app.addEventListener('click', (e) => {
     const target = e.target as HTMLElement
     if (target.closest('#preview-btn')) {
-      alert('Preview functionality coming soon!')
+      showPreviewModal()
     }
   })
   
@@ -824,6 +824,89 @@ async function checkAndProcessDownload() {
   loadSubscriptionStatus().then(status => {
     if (status.tier === 'free' && status.invoiceCount >= status.invoiceLimit) {
       showUpgradeModal(true)
+    }
+  })
+}
+
+// Preview modal
+function showPreviewModal() {
+  const { subtotal, tax, discount, total } = calculateTotals()
+  const lineItemsHtml = state.lineItems.map(item => `
+    <tr>
+      <td>${item.description || '-'}</td>
+      <td>${item.quantity}</td>
+      <td>${formatCurrency(item.rate)}</td>
+      <td>${formatCurrency(item.quantity * item.rate)}</td>
+    </tr>
+  `).join('')
+
+  const modal = document.createElement('div')
+  modal.className = 'modal-overlay'
+  modal.innerHTML = `
+    <div class="modal-content preview-modal">
+      <button class="modal-close" id="preview-close">×</button>
+      <div class="preview-header">
+        <div class="preview-logo">IOU</div>
+        <div class="preview-business">
+          <h2>${state.business.name || 'Your Business Name'}</h2>
+          <p>${state.business.email}${state.business.phone ? ' • ' + state.business.phone : ''}</p>
+          <p>${state.business.address}</p>
+        </div>
+        <div class="preview-invoice-meta">
+          <h1>INVOICE</h1>
+          <p><strong>#${state.invoice.number}</strong></p>
+          <p>Issued: ${state.invoice.issueDate}</p>
+          <p>Due: ${state.invoice.dueDate}</p>
+        </div>
+      </div>
+      <div class="preview-client">
+        <h3>Bill To:</h3>
+        <p><strong>${state.client.name || 'Client Name'}</strong></p>
+        <p>${state.client.email}</p>
+        <p>${state.client.address}</p>
+      </div>
+      <table class="preview-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Qty</th>
+            <th>Rate</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lineItemsHtml}
+        </tbody>
+      </table>
+      <div class="preview-totals">
+        <div class="totals-row">
+          <span>Subtotal</span>
+          <span>${formatCurrency(subtotal)}</span>
+        </div>
+        <div class="totals-row">
+          <span>Tax (${state.settings.taxRate}%)</span>
+          <span>${formatCurrency(tax)}</span>
+        </div>
+        <div class="totals-row">
+          <span>Discount (${state.settings.discount}%)</span>
+          <span>-${formatCurrency(discount)}</span>
+        </div>
+        <div class="totals-row total">
+          <span>Total</span>
+          <span>${formatCurrency(total)}</span>
+        </div>
+      </div>
+      ${state.notes.paymentTerms ? `<div class="preview-notes"><h4>Payment Terms</h4><p>${state.notes.paymentTerms}</p></div>` : ''}
+      ${state.notes.thankYou ? `<div class="preview-thanks"><p>${state.notes.thankYou}</p></div>` : ''}
+    </div>
+  `
+  document.body.appendChild(modal)
+
+  // Close handlers
+  modal.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).classList.contains('modal-overlay') || 
+        (e.target as HTMLElement).id === 'preview-close') {
+      modal.remove()
     }
   })
 }
