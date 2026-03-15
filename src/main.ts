@@ -2,7 +2,7 @@ import './style.css'
 import type { LineItem, InvoiceData } from './types'
 import { downloadInvoicePDF } from './pdf-generator'
 import { loadSubscriptionStatus, canCreateInvoice, incrementInvoiceCount, initiateUpgrade, renderPricingCards, handleCheckoutSuccess } from './subscription'
-import { initAuth, getAuthState, signIn, signUp, signOut, onAuthChange } from './supabase'
+import { initAuth, getAuthState, signIn, signUp, signOut, onAuthChange, supabase } from './supabase'
 import * as clients from './clients'
 
 // localStorage key
@@ -1207,10 +1207,8 @@ function showUpgradeModal(isLimitReached: boolean = false) {
   }
   
   // Client form submission
-  {
-    const appEl = document.getElementById('app')!
-    appEl.addEventListener('submit', async (e) => {
-      const target = e.target as HTMLFormElement
+  document.getElementById('app')!.addEventListener('submit', async (e: Event) => {
+    const target = e.target as HTMLFormElement
     
     if (target.id === 'client-form') {
       e.preventDefault()
@@ -1246,12 +1244,50 @@ function showUpgradeModal(isLimitReached: boolean = false) {
     }
   })
 }
+
+// Handle email confirmation from Supabase
+async function handleEmailConfirmation() {
+  // Check for hash params (Supabase confirmation uses hash, not query params)
+  const hashParams = new URLSearchParams(window.location.hash.substring(1))
+  const accessToken = hashParams.get('access_token')
+  const refreshToken = hashParams.get('refresh_token')
+  
+  if (accessToken && refreshToken) {
+    // Set session from URL tokens
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken
+    })
+    
+    if (!error && data.user) {
+      // Clear the hash from URL
+      history.replaceState(null, '', window.location.pathname)
+      showToast('Email confirmed! Welcome aboard! 🎉')
+      return true
+    }
+  }
+  
+  // Also check for error in hash (confirmation failed)
+  const errorDescription = hashParams.get('error_description')
+  if (errorDescription) {
+    showToast(errorDescription, true)
+    history.replaceState(null, '', window.location.pathname)
+    return true
+  }
+  
+  return false
 }
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
   // Set initial view from URL
   currentView = getViewFromUrl()
+  
+  // Handle email confirmation (from Supabase confirmation email)
+  const confirmed = await handleEmailConfirmation()
+  if (confirmed) {
+    // Will initialize auth below
+  }
   
   // Check if returning from checkout success
   if (window.location.search.includes('session_id')) {
