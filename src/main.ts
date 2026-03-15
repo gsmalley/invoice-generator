@@ -30,6 +30,28 @@ function loadFromLocalStorage(): InvoiceData | null {
 
 function clearLocalStorage(): void {
   localStorage.removeItem(STORAGE_KEY)
+}
+
+function clearDraft(): void {
+  clearLocalStorage()
+  
+  // Reset state to default values
+  state.business = { name: '', email: '', phone: '', website: '', address: '' }
+  state.client = { name: '', email: '', address: '' }
+  state.invoice = {
+    number: 'INV-001',
+    issueDate: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  }
+  state.settings = { currency: 'USD', taxRate: 0, discount: 0 }
+  state.lineItems = [{ description: '', quantity: 1, rate: 0 }]
+  state.notes = {
+    paymentTerms: 'Payment is due within 30 days of invoice date. Thank you for your business!',
+    thankYou: 'Thank you for your business!'
+  }
+  
+  render()
+  setupEventListeners()
   showToast('Draft cleared')
 }
 
@@ -750,9 +772,7 @@ function setupEventListeners() {
     const target = e.target as HTMLElement
     if (target.closest('#clear-draft-btn')) {
       if (confirm('Are you sure you want to clear the saved draft? This cannot be undone.')) {
-        clearLocalStorage()
-        // Reset to default state
-        location.reload()
+        clearDraft()
       }
     }
   })
