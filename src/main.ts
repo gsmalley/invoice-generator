@@ -2,7 +2,7 @@ import './style.css'
 import type { LineItem, InvoiceData } from './types'
 import { downloadInvoicePDF } from './pdf-generator'
 import { loadSubscriptionStatus, canCreateInvoice, incrementInvoiceCount, initiateUpgrade, renderPricingCards, handleCheckoutSuccess } from './subscription'
-import { initAuth, getAuthState, signIn, signUp, signOut } from './supabase'
+import { initAuth, getAuthState, signIn, signUp, signOut, onAuthChange } from './supabase'
 import * as clients from './clients'
 
 // localStorage key
@@ -1268,6 +1268,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Initialize Supabase auth
   await initAuth()
+  
+  // Listen for auth changes and re-render UI
+  onAuthChange((user) => {
+    console.log('Auth changed:', user?.email)
+    render()
+    setupEventListeners()
+    if (user) {
+      loadClientsList()
+    }
+  })
+  
   const authState = getAuthState()
   
   if (authState.user) {

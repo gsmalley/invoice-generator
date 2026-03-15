@@ -38,6 +38,13 @@ let currentAuthState: AuthState = {
   error: null
 }
 
+// Auth change callback
+let authChangeCallback: ((user: User | null) => void) | null = null
+
+export function onAuthChange(callback: (user: User | null) => void) {
+  authChangeCallback = callback
+}
+
 // Auth functions
 export async function signUp(email: string, password: string): Promise<{ user: User | null; error: string | null }> {
   const { data, error } = await supabase.auth.signUp({
@@ -110,6 +117,10 @@ export function initAuth(): Promise<User | null> {
         currentAuthState = { user: session.user as User, loading: false, error: null }
       } else {
         currentAuthState = { user: null, loading: false, error: null }
+      }
+      // Notify UI of auth change
+      if (authChangeCallback) {
+        authChangeCallback(currentAuthState.user)
       }
     })
   })
