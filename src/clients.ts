@@ -1,97 +1,103 @@
 // Client management module
-// Handles CRUD operations for saved clients
+// Handles CRUD operations for saved clients via Supabase
 
 import type { ClientInfo } from './types'
+import { supabase, clientsDb, getCurrentUser } from './supabase'
 
-// Storage key
-const CLIENTS_STORAGE_KEY = 'saved_clients'
-
-// Client with ID
+// Client with ID (from Supabase)
 export interface SavedClient extends ClientInfo {
   id: string
-  createdAt: number
-  updatedAt: number
+  user_id: string
+  created_at: string
+  updated_at: string
 }
 
-// Get all saved clients
-export function getClients(): SavedClient[] {
+// Get all saved clients for current user
+export async function getClients(): Promise<SavedClient[]> {
+  const user = getCurrentUser()
+  if (!user) {
+    console.warn('No user logged in, returning empty array')
+    return []
+  }
+  
   try {
-    const stored = localStorage.getItem(CLIENTS_STORAGE_KEY)
-    return stored ? JSON.parse(stored) : []
+    const clients = await clientsDb.getAll(user.id)
+    return clients as SavedClient[]
   } catch (error) {
     console.error('Failed to load clients:', error)
     return []
   }
 }
 
-// Generate unique ID
-function generateId(): string {
-  return 'client_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9)
-}
-
 // Save a new client
-export function addClient(client: Omit<SavedClient, 'id' | 'createdAt' | 'updatedAt'>): SavedClient {
-  const clients = getClients()
-  
-  const newClient: SavedClient = {
-    ...client,
-    id: generateId(),
-    createdAt: Date.now(),
-    updatedAt: Date.now()
+export async function addClient(client: Omit<SavedClient, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<SavedClient | null> {
+  const user = getCurrentUser()
+  if (!user) {
+    console.error('User not logged in')
+    return null
   }
   
-  clients.push(newClient)
-  saveClients(clients)
-  
-  return newClient
+  try {
+    const newClient = await clientsDb.create({
+      ...client,
+      user_id: user.id
+    })
+    return newClient as SavedClient
+  } catch (error) {
+    console.error('Failed to add client:', error)
+    return null
+  }
 }
 
 // Update an existing client
-export function updateClient(id: string, updates: Partial<Omit<SavedClient, 'id' | 'createdAt'>>): SavedClient | null {
-  const clients = getClients()
-  const index = clients.findIndex(c => c.id === id)
-  
-  if (index === -1) return null
-  
-  clients[index] = {
-    ...clients[index],
-    ...updates,
-    updatedAt: Date.now()
+export async function updateClient(id: string, updates: Partial<Omit<SavedClient, 'id' | 'user_id' | 'created_at'>>): Promise<SavedClient | null> {
+  try {
+    const updated = await clientsDb.update(id, {
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    return updated as SavedClient
+  } catch (error) {
+    console.error('Failed to update client:', error)
+    return null
   }
-  
-  saveClients(clients)
-  return clients[index]
 }
 
 // Delete a client
-export function deleteClient(id: string): boolean {
-  const clients = getClients()
-  const filtered = clients.filter(c => c.id !== id)
-  
-  if (filtered.length === clients.length) return false
-  
-  saveClients(filtered)
-  return true
+export async function deleteClient(id: string): Promise<boolean> {
+  try {
+    await clientsDb.delete(id)
+    return true
+  } catch (error) {
+    console.error('Failed to delete client:', error)
+    return false
+  }
 }
 
 // Get a single client by ID
-export function getClient(id: string): SavedClient | null {
-  const clients = getClients()
-  return clients.find(c => c.id === id) || null
-}
-
-// Save clients to localStorage
-function saveClients(clients: SavedClient[]): void {
+export async function getClient(id: string): Promise<SavedClient | null> {
   try {
-    localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(clients))
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (error) throw error
+    return data as SavedClient
   } catch (error) {
-    console.error('Failed to save clients:', error)
+    console.error('Failed to get client:', error)
+    return null
   }
 }
 
 // Create client dropdown HTML
-export function renderClientSelector(selectedId?: string): string {
-  const clients = getClients()
+export async function renderClientSelector(selectedId?: string): Promise<string> {
+  const clients = await getClients()
+  
+  if (clients.length === 0) {
+    return '<option value="">-- No saved clients --</option>'
+  }
   
   const options = clients.map(client => 
     `<option value="${client.id}" ${client.id === selectedId ? 'selected' : ''}>${client.name}</option>`
@@ -104,8 +110,8 @@ export function renderClientSelector(selectedId?: string): string {
 }
 
 // Get client info as ClientInfo (for use in InvoiceData)
-export function getClientForInvoice(id: string): ClientInfo | null {
-  const client = getClient(id)
+export async function getClientForInvoice(id: string): Promise<ClientInfo | null> {
+  const client = await getClient(id)
   if (!client) return null
   
   return {
@@ -116,8 +122,8 @@ export function getClientForInvoice(id: string): ClientInfo | null {
 }
 
 // Render client list for management UI
-export function renderClientList(): string {
-  const clients = getClients()
+export async function renderClientList(): Promise<string> {
+  const clients = await getClients()
   
   if (clients.length === 0) {
     return '<p class="empty-state">No saved clients yet. Add your first client!</p>'

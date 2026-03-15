@@ -2,6 +2,7 @@ import './style.css'
 import type { LineItem, InvoiceData } from './types'
 import { downloadInvoicePDF } from './pdf-generator'
 import { loadSubscriptionStatus, canCreateInvoice, incrementInvoiceCount, initiateUpgrade, renderPricingCards, handleCheckoutSuccess } from './subscription'
+import { initAuth, getAuthState } from './supabase'
 import * as clients from './clients'
 
 // localStorage key
@@ -289,7 +290,7 @@ function renderClientsPage(): string {
         </div>
         
         <div class="clients-list" id="clients-list">
-          ${clients.renderClientList()}
+          <p class="loading">Loading clients...</p>
         </div>
         
         <div class="client-form-container" id="client-form-container" style="display: none;">
@@ -298,6 +299,19 @@ function renderClientsPage(): string {
       </div>
     </main>
   `
+}
+
+// Load clients list dynamically
+async function loadClientsList() {
+  const container = document.getElementById('clients-list')
+  if (!container) return
+  
+  try {
+    const html = await clients.renderClientList()
+    container.innerHTML = html
+  } catch (error) {
+    container.innerHTML = '<p class="empty-state">Failed to load clients. Please log in.</p>'
+  }
 }
 
 // Render Invoices list page
@@ -664,6 +678,11 @@ function setupEventListeners() {
         updateUrl(view)
         render()
         setupEventListeners()
+        
+        // Load clients list when switching to clients view
+        if (view === 'clients') {
+          loadClientsList()
+        }
       }
     }
   })
@@ -828,7 +847,7 @@ function showUpgradeModal(isLimitReached: boolean = false) {
   // Client management
   {
     const appEl = document.getElementById('app')!
-    appEl.addEventListener('click', (e) => {
+    appEl.addEventListener('click', async (e) => {
       const target = e.target as HTMLElement
       const action = target.closest('button')?.dataset.action
       const id = target.closest('button')?.dataset.id
@@ -847,7 +866,7 @@ function showUpgradeModal(isLimitReached: boolean = false) {
       
       // Edit client
       if (action === 'edit' && id) {
-        const client = clients.getClient(id)
+        const client = await clients.getClient(id)
         if (client) {
           const formContainer = document.getElementById('client-form-container')
           const clientsList = document.getElementById('clients-list')
@@ -863,10 +882,11 @@ function showUpgradeModal(isLimitReached: boolean = false) {
       // Delete client
       if (action === 'delete' && id) {
         if (confirm('Are you sure you want to delete this client?')) {
-          clients.deleteClient(id)
-          showToast('Client deleted')
-          render()
-          setupEventListeners()
+          const success = await clients.deleteClient(id)
+          if (success) {
+            showToast('Client deleted')
+            await loadClientsList()
+          }
         }
         return
       }
@@ -885,7 +905,7 @@ function showUpgradeModal(isLimitReached: boolean = false) {
   // Client form submission
   {
     const appEl = document.getElementById('app')!
-    appEl.addEventListener('submit', (e) => {
+    appEl.addEventListener('submit', async (e) => {
       const target = e.target as HTMLFormElement
     
     if (target.id === 'client-form') {
@@ -901,16 +921,24 @@ function showUpgradeModal(isLimitReached: boolean = false) {
       
       if (id) {
         // Update existing client
-        clients.updateClient(id, clientData)
-        showToast('Client updated')
+        const result = await clients.updateClient(id, clientData)
+        if (result) {
+          showToast('Client updated')
+        }
       } else {
         // Add new client
-        clients.addClient(clientData)
-        showToast('Client added')
+        const result = await clients.addClient(clientData)
+        if (result) {
+          showToast('Client added')
+        }
       }
       
-      render()
-      setupEventListeners()
+      // Show list, hide form, reload clients
+      const formContainer = document.getElementById('client-form-container')
+      const clientsList = document.getElementById('clients-list')
+      if (formContainer) formContainer.style.display = 'none'
+      if (clientsList) clientsList.style.display = 'block'
+      await loadClientsList()
     }
   })
 }
@@ -934,6 +962,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast('Draft loaded')
   }
   
+  // Initialize Supabase auth
+  await initAuth()
+  const authState = getAuthState()
+  
+  if (authState.user) {
+    console.log('User logged in:', authState.user.email)
+  } else {
+    console.log('No user logged in - data will be stored locally')
+  }
+  
   // Load subscription status
   const subscriptionStatus = await loadSubscriptionStatus()
   
@@ -944,4 +982,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   render()
   setupEventListeners()
+  
+  // Load clients if user is logged in
+  if (authState.user) {
+    loadClientsList()
+  }
 })
