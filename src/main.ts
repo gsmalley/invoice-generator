@@ -771,9 +771,7 @@ function setupEventListeners() {
   app.addEventListener('click', (e) => {
     const target = e.target as HTMLElement
     if (target.closest('#clear-draft-btn')) {
-      if (confirm('Are you sure you want to clear the saved draft? This cannot be undone.')) {
-        clearDraft()
-      }
+      clearDraft()
     }
   })
   
