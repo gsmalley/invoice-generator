@@ -2,7 +2,7 @@ import './style.css'
 import type { LineItem, InvoiceData } from './types'
 import { downloadInvoicePDF } from './pdf-generator'
 import { loadSubscriptionStatus, canCreateInvoice, incrementInvoiceCount, initiateUpgrade, renderPricingCards, handleCheckoutSuccess } from './subscription'
-import { initAuth, getAuthState } from './supabase'
+import { initAuth, getAuthState, signIn, signUp, signOut } from './supabase'
 import * as clients from './clients'
 
 // localStorage key
@@ -56,12 +56,12 @@ function clearDraft(): void {
 }
 
 // Toast notification
-function showToast(message: string) {
+function showToast(message: string, isError: boolean = false) {
   const existing = document.querySelector('.toast')
   if (existing) existing.remove()
   
   const toast = document.createElement('div')
-  toast.className = 'toast'
+  toast.className = `toast${isError ? ' toast-error' : ''}`
   toast.textContent = message
   document.body.appendChild(toast)
   
@@ -70,6 +70,147 @@ function showToast(message: string) {
     toast.classList.remove('show')
     setTimeout(() => toast.remove(), 300)
   }, 2000)
+}
+
+function showAuthModal(mode: 'login' | 'signup' = 'login') {
+  // Remove existing modal if any
+  const existing = document.querySelector('.auth-modal-overlay')
+  if (existing) existing.remove()
+  
+  const isLogin = mode === 'login'
+  const modal = document.createElement('div')
+  modal.className = 'modal-overlay auth-modal-overlay'
+  modal.innerHTML = `
+    <div class="modal-content auth-modal">
+      <button class="modal-close auth-modal-close">×</button>
+      <div class="auth-modal-header">
+        <div class="logo">
+          <div class="logo-icon">IOU</div>
+          <span>Maker</div>
+        </div>
+        <h2>${isLogin ? 'Welcome back' : 'Create an account'}</h2>
+        <p class="auth-subtitle">${isLogin ? 'Sign in to manage your invoices' : 'Start creating invoices in seconds'}</p>
+      </div>
+      
+      <form class="auth-form" id="auth-form">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" name="email" placeholder="you@example.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-input" name="password" placeholder="••••••••" required minlength="6">
+        </div>
+        ${!isLogin ? `
+        <div class="form-group">
+          <label class="form-label">Confirm Password</label>
+          <input type="password" class="form-input" name="confirmPassword" placeholder="••••••••" required minlength="6">
+        </div>
+        ` : ''}
+        
+        <div class="auth-error" id="auth-error" style="display: none;"></div>
+        
+        <button type="submit" class="btn btn-primary btn-full" id="auth-submit-btn">
+          ${isLogin ? 'Sign In' : 'Create Account'}
+        </button>
+      </form>
+      
+      <div class="auth-footer">
+        <p>${isLogin ? "Don't have an account?" : 'Already have an account?'} 
+          <a href="#" id="auth-toggle">${isLogin ? 'Sign up' : 'Sign in'}</a>
+        </p>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+  
+  // Close handlers
+  modal.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).classList.contains('modal-overlay') || 
+        (e.target as HTMLElement).classList.contains('auth-modal-close')) {
+      modal.remove()
+    }
+  })
+  
+  // Toggle between login and signup
+  modal.querySelector('#auth-toggle')?.addEventListener('click', (e) => {
+    e.preventDefault()
+    showAuthModal(isLogin ? 'signup' : 'login')
+  })
+  
+  // Form submission
+  modal.querySelector('#auth-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const form = e.target as HTMLFormElement
+    const formData = new FormData(form)
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+    const confirmPassword = formData.get('confirmPassword') as string
+    const submitBtn = form.querySelector('#auth-submit-btn') as HTMLButtonElement
+    
+    const errorEl = document.getElementById('auth-error')
+    
+    // Client-side validation
+    if (!isLogin && password !== confirmPassword) {
+      if (errorEl) {
+        errorEl.textContent = 'Passwords do not match'
+        errorEl.style.display = 'block'
+      }
+      return
+    }
+    
+    // Show loading state
+    submitBtn.disabled = true
+    submitBtn.textContent = isLogin ? 'Signing in...' : 'Creating account...'
+    if (errorEl) errorEl.style.display = 'none'
+    
+    try {
+      if (isLogin) {
+        const result = await signIn(email, password)
+        if (result.error) {
+          if (errorEl) {
+            errorEl.textContent = result.error
+            errorEl.style.display = 'block'
+          }
+        } else {
+          showToast('Welcome back!')
+          modal.remove()
+          render()
+          setupEventListeners()
+          // Load clients if logged in
+          if (getAuthState().user) {
+            loadClientsList()
+          }
+        }
+      } else {
+        const result = await signUp(email, password)
+        if (result.error) {
+          if (errorEl) {
+            errorEl.textContent = result.error
+            errorEl.style.display = 'block'
+          }
+        } else {
+          showToast('Account created! Please check your email to verify.')
+          modal.remove()
+        }
+      }
+    } catch (err: any) {
+      if (errorEl) {
+        errorEl.textContent = 'Something went wrong. Please try again.'
+        errorEl.style.display = 'block'
+      }
+    } finally {
+      submitBtn.disabled = false
+      submitBtn.textContent = isLogin ? 'Sign In' : 'Create Account'
+    }
+  })
+}
+
+async function handleLogout() {
+  await signOut()
+  showToast('Logged out successfully')
+  render()
+  setupEventListeners()
 }
 
 // Icons as SVG strings
@@ -204,14 +345,25 @@ function renderSidebar(): string {
       
       <nav class="nav-section" style="margin-top: auto;">
         <div class="nav-label">Account</div>
-        <button class="nav-item ${currentView === 'profile' ? 'active' : ''}" data-view="profile">
-          ${icons.user}
-          Profile
-        </button>
-        <button class="nav-item">
-          ${icons.logout}
-          Logout
-        </button>
+        ${getAuthState().user ? `
+          <div class="user-info">
+            <div class="user-avatar">${getAuthState().user?.email?.charAt(0).toUpperCase()}</div>
+            <div class="user-email">${getAuthState().user?.email}</div>
+          </div>
+          <button class="nav-item ${currentView === 'profile' ? 'active' : ''}" data-view="profile">
+            ${icons.user}
+            Profile
+          </button>
+          <button class="nav-item" id="logout-btn">
+            ${icons.logout}
+            Logout
+          </button>
+        ` : `
+          <button class="nav-item" id="login-btn">
+            ${icons.user}
+            Login
+          </button>
+        `}
       </nav>
     </aside>
   `
@@ -382,17 +534,37 @@ function renderSettingsPage(): string {
 
 // Render Profile page
 function renderProfilePage(): string {
+  const authUser = getAuthState().user
   return `
     <main class="main-content">
       <header class="page-header">
         <h1 class="page-title">Profile</h1>
       </header>
       <div class="profile-section">
+        ${authUser ? `
+          <div class="profile-user-card">
+            <div class="user-avatar-large">${authUser.email?.charAt(0).toUpperCase()}</div>
+            <div class="profile-user-info">
+              <h3>${authUser.email}</h3>
+              <p>Member since ${new Date(authUser.created_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+        ` : ''}
         <h3>Account Settings</h3>
         <div class="form-group">
           <label>Email</label>
-          <input type="email" class="form-control" value="${state.business.email}" placeholder="your@email.com">
+          <input type="email" class="form-control" value="${authUser?.email || state.business.email}" placeholder="your@email.com" ${authUser ? 'readonly' : ''}>
         </div>
+        ${!authUser ? `
+        <div class="auth-prompt">
+          <p>Sign in to save your data and access it from any device.</p>
+          <button class="btn btn-primary" id="profile-login-btn">Sign In / Sign Up</button>
+        </div>
+        ` : `
+        <div class="form-group" style="margin-top: 20px;">
+          <button class="btn btn-outline" id="profile-logout-btn">Sign Out</button>
+        </div>
+        `}
       </div>
     </main>
   `
@@ -788,6 +960,38 @@ function setupEventListeners() {
     if (target.closest('#download-btn')) {
       // Check subscription before downloading
       checkAndProcessDownload()
+    }
+  })
+  
+  // Login button
+  app.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement
+    if (target.closest('#login-btn')) {
+      showAuthModal('login')
+    }
+  })
+  
+  // Logout button
+  app.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement
+    if (target.closest('#logout-btn')) {
+      handleLogout()
+    }
+  })
+  
+  // Profile page login button
+  app.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement
+    if (target.closest('#profile-login-btn')) {
+      showAuthModal('login')
+    }
+  })
+  
+  // Profile page logout button
+  app.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement
+    if (target.closest('#profile-logout-btn')) {
+      handleLogout()
     }
   })
 }
