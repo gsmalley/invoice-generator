@@ -1018,3 +1018,70 @@ textarea.form-input {
   font-weight: 600;
   font-size: 14px;
 }
+
+.user-email {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Toast error */
+.toast.toast-error {
+  background: var(--color-error);
+}
+
+/* Profile Page */
+.profile-section h3 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+}
+
+.profile-user-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  margin-bottom: 24px;
+}
+
+.user-avatar-large {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 24px;
+}
+
+.profile-user-info h3 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+}
+
+.profile-user-info p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.auth-prompt {
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--color-primary-subtle);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.auth-prompt p {
+  margin-bottom: 12px;
+  color: var(--color-text-secondary);
+}

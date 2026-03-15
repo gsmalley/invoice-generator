@@ -2,11 +2,8 @@ import './style.css'
 import type { LineItem, InvoiceData } from './types'
 import { downloadInvoicePDF } from './pdf-generator'
 import { loadSubscriptionStatus, canCreateInvoice, incrementInvoiceCount, initiateUpgrade, renderPricingCards, handleCheckoutSuccess } from './subscription'
-import { initAuth, getAuthState, signIn, signUp, signOut } from './supabase'
+import { initAuth, getAuthState, signIn, signUp, signOut, onAuthChange } from './supabase'
 import * as clients from './clients'
-
-// Global auth state (updated on init and after auth changes)
-let authState: { user: any, loading: boolean, error: string | null } = { user: null, loading: true, error: null }
 
 // localStorage key
 const STORAGE_KEY = 'invoice_draft'
@@ -59,12 +56,12 @@ function clearDraft(): void {
 }
 
 // Toast notification
-function showToast(message: string) {
+function showToast(message: string, isError: boolean = false) {
   const existing = document.querySelector('.toast')
   if (existing) existing.remove()
   
   const toast = document.createElement('div')
-  toast.className = 'toast'
+  toast.className = `toast${isError ? ' toast-error' : ''}`
   toast.textContent = message
   document.body.appendChild(toast)
   
@@ -89,7 +86,7 @@ function showAuthModal(mode: 'login' | 'signup' = 'login') {
       <div class="auth-modal-header">
         <div class="logo">
           <div class="logo-icon">IOU</div>
-          <span>Maker</span>
+          <span>Maker</div>
         </div>
         <h2>${isLogin ? 'Welcome back' : 'Create an account'}</h2>
         <p class="auth-subtitle">${isLogin ? 'Sign in to manage your invoices' : 'Start creating invoices in seconds'}</p>
@@ -182,7 +179,7 @@ function showAuthModal(mode: 'login' | 'signup' = 'login') {
           setupEventListeners()
           // Load clients if logged in
           if (getAuthState().user) {
-            (window as any).loadClientsList?.()
+            loadClientsList()
           }
         }
       } else {
@@ -348,20 +345,24 @@ function renderSidebar(): string {
       
       <nav class="nav-section" style="margin-top: auto;">
         <div class="nav-label">Account</div>
-        ${authState.user ? `
-        <button class="nav-item ${currentView === 'profile' ? 'active' : ''}" data-view="profile">
-          ${icons.user}
-          Profile
-        </button>
-        <button class="nav-item" id="logout-btn">
-          ${icons.logout}
-          Logout
-        </button>
+        ${getAuthState().user ? `
+          <div class="user-info">
+            <div class="user-avatar">${getAuthState().user?.email?.charAt(0).toUpperCase()}</div>
+            <div class="user-email">${getAuthState().user?.email}</div>
+          </div>
+          <button class="nav-item ${currentView === 'profile' ? 'active' : ''}" data-view="profile">
+            ${icons.user}
+            Profile
+          </button>
+          <button class="nav-item" id="logout-btn">
+            ${icons.logout}
+            Logout
+          </button>
         ` : `
-        <button class="nav-item" id="login-btn">
-          ${icons.user}
-          Login
-        </button>
+          <button class="nav-item" id="login-btn">
+            ${icons.user}
+            Login
+          </button>
         `}
       </nav>
     </aside>
@@ -533,17 +534,37 @@ function renderSettingsPage(): string {
 
 // Render Profile page
 function renderProfilePage(): string {
+  const authUser = getAuthState().user
   return `
     <main class="main-content">
       <header class="page-header">
         <h1 class="page-title">Profile</h1>
       </header>
       <div class="profile-section">
+        ${authUser ? `
+          <div class="profile-user-card">
+            <div class="user-avatar-large">${authUser.email?.charAt(0).toUpperCase()}</div>
+            <div class="profile-user-info">
+              <h3>${authUser.email}</h3>
+              <p>Member since ${new Date(authUser.created_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+        ` : ''}
         <h3>Account Settings</h3>
         <div class="form-group">
           <label>Email</label>
-          <input type="email" class="form-control" value="${state.business.email}" placeholder="your@email.com">
+          <input type="email" class="form-control" value="${authUser?.email || state.business.email}" placeholder="your@email.com" ${authUser ? 'readonly' : ''}>
         </div>
+        ${!authUser ? `
+        <div class="auth-prompt">
+          <p>Sign in to save your data and access it from any device.</p>
+          <button class="btn btn-primary" id="profile-login-btn">Sign In / Sign Up</button>
+        </div>
+        ` : `
+        <div class="form-group" style="margin-top: 20px;">
+          <button class="btn btn-outline" id="profile-logout-btn">Sign Out</button>
+        </div>
+        `}
       </div>
     </main>
   `
@@ -1247,7 +1268,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Initialize Supabase auth
   await initAuth()
-  authState = getAuthState()
+  
+  // Listen for auth changes and re-render UI
+  onAuthChange((user) => {
+    console.log('Auth changed:', user?.email)
+    render()
+    setupEventListeners()
+    if (user) {
+      loadClientsList()
+    }
+  })
+  
+  const authState = getAuthState()
   
   if (authState.user) {
     console.log('User logged in:', authState.user.email)
