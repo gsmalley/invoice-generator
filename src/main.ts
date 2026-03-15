@@ -699,7 +699,6 @@ function setupEventListeners() {
         currentView = view
         updateUrl(view)
         render()
-        setupEventListeners()
         
         // Load clients list when switching to clients view
         if (view === 'clients') {
