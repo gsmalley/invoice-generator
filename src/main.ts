@@ -86,7 +86,7 @@ function showAuthModal(mode: 'login' | 'signup' = 'login') {
       <div class="auth-modal-header">
         <div class="logo">
           <div class="logo-icon">IOU</div>
-          <span>Maker</div>
+          <span>Maker</span>
         </div>
         <h2>${isLogin ? 'Welcome back' : 'Create an account'}</h2>
         <p class="auth-subtitle">${isLogin ? 'Sign in to manage your invoices' : 'Start creating invoices in seconds'}</p>
