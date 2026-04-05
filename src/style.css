@@ -932,6 +932,8 @@ textarea.form-input {
   max-width: 400px;
   padding: 32px;
   overflow-y: visible;
+  background: white;
+  border-radius: 12px;
 }
 
 .auth-modal-header {

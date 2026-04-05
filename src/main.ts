@@ -1157,7 +1157,7 @@ function showUpgradeModal(isLimitReached: boolean = false) {
       const id = target.closest('button')?.dataset.id
       
       // Add client button
-      if (target.id === 'add-client-btn') {
+      if (target.closest('#add-client-btn')) {
         const formContainer = document.getElementById('client-form-container')
         const clientsList = document.getElementById('clients-list')
         if (formContainer) {
@@ -1196,7 +1196,7 @@ function showUpgradeModal(isLimitReached: boolean = false) {
       }
       
       // Cancel client form
-      if (target.id === 'cancel-client-btn') {
+      if (target.closest('#cancel-client-btn')) {
         const formContainer = document.getElementById('client-form-container')
         const clientsList = document.getElementById('clients-list')
         if (formContainer) formContainer.style.display = 'none'
@@ -1210,7 +1210,7 @@ function showUpgradeModal(isLimitReached: boolean = false) {
   document.getElementById('app')!.addEventListener('submit', async (e: Event) => {
     const target = e.target as HTMLFormElement
     
-    if (target.id === 'client-form') {
+    if (target.closest('#client-form')) {
       e.preventDefault()
       const formData = new FormData(target)
       const id = formData.get('id') as string
