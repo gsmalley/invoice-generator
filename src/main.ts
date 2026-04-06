@@ -1001,10 +1001,14 @@ function setupEventListeners() {
     const action = target.closest('button')?.dataset.action
     const id = target.closest('button')?.dataset.id
     
+    console.log('Client click handler:', { target, action, id, closestAddClient: target.closest('#add-client-btn') })
+    
     // Add client button
     if (target.closest('#add-client-btn')) {
+      console.log('Add client button clicked!')
       const formContainer = document.getElementById('client-form-container')
       const clientsList = document.getElementById('clients-list')
+      console.log('Elements:', { formContainer, clientsList })
       if (formContainer) {
         formContainer.style.display = 'block'
         formContainer.innerHTML = clients.renderClientForm()

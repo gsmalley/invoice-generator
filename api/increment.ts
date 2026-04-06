@@ -3,6 +3,7 @@ import type Stripe from 'stripe'
 import type { Customer } from 'stripe'
 
 // Conditionally import Stripe only if key is available
+// Using 'Customer' type import to avoid namespace issues in Vercel build
 let stripe: Stripe | null = null
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 
