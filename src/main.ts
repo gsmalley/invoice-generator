@@ -994,6 +994,99 @@ function setupEventListeners() {
       handleLogout()
     }
   })
+  
+  // Client management
+  app.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement
+    const action = target.closest('button')?.dataset.action
+    const id = target.closest('button')?.dataset.id
+    
+    // Add client button
+    if (target.closest('#add-client-btn')) {
+      const formContainer = document.getElementById('client-form-container')
+      const clientsList = document.getElementById('clients-list')
+      if (formContainer) {
+        formContainer.style.display = 'block'
+        formContainer.innerHTML = clients.renderClientForm()
+      }
+      if (clientsList) clientsList.style.display = 'none'
+      return
+    }
+    
+    // Edit client
+    if (action === 'edit' && id) {
+      const client = await clients.getClient(id)
+      if (client) {
+        const formContainer = document.getElementById('client-form-container')
+        const clientsList = document.getElementById('clients-list')
+        if (formContainer) {
+          formContainer.style.display = 'block'
+          formContainer.innerHTML = clients.renderClientForm(client)
+        }
+        if (clientsList) clientsList.style.display = 'none'
+      }
+      return
+    }
+    
+    // Delete client
+    if (action === 'delete' && id) {
+      if (confirm('Are you sure you want to delete this client?')) {
+        const success = await clients.deleteClient(id)
+        if (success) {
+          showToast('Client deleted')
+          await loadClientsList()
+        }
+      }
+      return
+    }
+    
+    // Cancel client form
+    if (target.closest('#cancel-client-btn')) {
+      const formContainer = document.getElementById('client-form-container')
+      const clientsList = document.getElementById('clients-list')
+      if (formContainer) formContainer.style.display = 'none'
+      if (clientsList) clientsList.style.display = 'block'
+      return
+    }
+  })
+  
+  // Client form submission
+  app.addEventListener('submit', async (e: Event) => {
+    const target = e.target as HTMLFormElement
+    
+    if (target.closest('#client-form')) {
+      e.preventDefault()
+      const formData = new FormData(target)
+      const id = formData.get('id') as string
+      
+      const clientData = {
+        name: formData.get('name') as string,
+        email: formData.get('email') as string,
+        address: formData.get('address') as string
+      }
+      
+      if (id) {
+        // Update existing client
+        const result = await clients.updateClient(id, clientData)
+        if (result) {
+          showToast('Client updated')
+        }
+      } else {
+        // Add new client
+        const result = await clients.addClient(clientData)
+        if (result) {
+          showToast('Client added')
+        }
+      }
+      
+      // Show list, hide form, reload clients
+      const formContainer = document.getElementById('client-form-container')
+      const clientsList = document.getElementById('clients-list')
+      if (formContainer) formContainer.style.display = 'none'
+      if (clientsList) clientsList.style.display = 'block'
+      await loadClientsList()
+    }
+  })
 }
 
 // Render and initialize
@@ -1146,102 +1239,6 @@ function showUpgradeModal(isLimitReached: boolean = false) {
         await initiateUpgrade(tier)
       }
     })
-  })
-  
-  // Client management
-  {
-    const appEl = document.getElementById('app')!
-    appEl.addEventListener('click', async (e) => {
-      const target = e.target as HTMLElement
-      const action = target.closest('button')?.dataset.action
-      const id = target.closest('button')?.dataset.id
-      
-      // Add client button
-      if (target.closest('#add-client-btn')) {
-        const formContainer = document.getElementById('client-form-container')
-        const clientsList = document.getElementById('clients-list')
-        if (formContainer) {
-          formContainer.style.display = 'block'
-          formContainer.innerHTML = clients.renderClientForm()
-        }
-        if (clientsList) clientsList.style.display = 'none'
-        return
-      }
-      
-      // Edit client
-      if (action === 'edit' && id) {
-        const client = await clients.getClient(id)
-        if (client) {
-          const formContainer = document.getElementById('client-form-container')
-          const clientsList = document.getElementById('clients-list')
-          if (formContainer) {
-            formContainer.style.display = 'block'
-            formContainer.innerHTML = clients.renderClientForm(client)
-          }
-          if (clientsList) clientsList.style.display = 'none'
-        }
-        return
-      }
-      
-      // Delete client
-      if (action === 'delete' && id) {
-        if (confirm('Are you sure you want to delete this client?')) {
-          const success = await clients.deleteClient(id)
-          if (success) {
-            showToast('Client deleted')
-            await loadClientsList()
-          }
-        }
-        return
-      }
-      
-      // Cancel client form
-      if (target.closest('#cancel-client-btn')) {
-        const formContainer = document.getElementById('client-form-container')
-        const clientsList = document.getElementById('clients-list')
-        if (formContainer) formContainer.style.display = 'none'
-        if (clientsList) clientsList.style.display = 'block'
-        return
-      }
-    })
-  }
-  
-  // Client form submission
-  document.getElementById('app')!.addEventListener('submit', async (e: Event) => {
-    const target = e.target as HTMLFormElement
-    
-    if (target.closest('#client-form')) {
-      e.preventDefault()
-      const formData = new FormData(target)
-      const id = formData.get('id') as string
-      
-      const clientData = {
-        name: formData.get('name') as string,
-        email: formData.get('email') as string,
-        address: formData.get('address') as string
-      }
-      
-      if (id) {
-        // Update existing client
-        const result = await clients.updateClient(id, clientData)
-        if (result) {
-          showToast('Client updated')
-        }
-      } else {
-        // Add new client
-        const result = await clients.addClient(clientData)
-        if (result) {
-          showToast('Client added')
-        }
-      }
-      
-      // Show list, hide form, reload clients
-      const formContainer = document.getElementById('client-form-container')
-      const clientsList = document.getElementById('clients-list')
-      if (formContainer) formContainer.style.display = 'none'
-      if (clientsList) clientsList.style.display = 'block'
-      await loadClientsList()
-    }
   })
 }
 
