@@ -1,7 +1,8 @@
 import { METADATA_KEYS } from './webhook'
+import type Stripe from 'stripe'
 
 // Conditionally import Stripe only if key is available
-let stripe: any = null
+let stripe: Stripe | null = null
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 
 if (stripeSecretKey) {
