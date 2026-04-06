@@ -1,5 +1,6 @@
 import { METADATA_KEYS } from './webhook'
 import type Stripe from 'stripe'
+import type { Customer } from 'stripe'
 
 // Conditionally import Stripe only if key is available
 let stripe: Stripe | null = null
@@ -49,7 +50,7 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     // Get current customer
-    const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer
+    const customer = await stripe.customers.retrieve(customerId) as Customer
     const metadata = customer.metadata || {}
 
     // Get current invoice count
